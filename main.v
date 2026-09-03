@@ -30,10 +30,12 @@ module computer;
     reg b_oe;
     register b(bus, b_out, b_we, b_oe, clock);
 
+    wire [15:0] alu_out_;
+    alu alu(a_out, b_out, alu_out_, '1, '0);
+
+    reg gate__alu_out;
     wire [15:0] alu_out;
-    // reg gate__alu_out__bus;
-    alu alu(a_out, b_out, alu_out, '1, '0);
-    // gate #(.WIDTH(16)) alu_out__bus(alu_out, bus, gate__alu_out__bus);
+    gate #(.WIDTH(16)) alu_out__bus(alu_out_, alu_out, gate__alu_out);
 
     assign bus = use_constant ? constant : (alu_out);
 
@@ -41,7 +43,8 @@ module computer;
 		$monitor("time=%0t bus=%b a_out=%b b_out=%b", $time, bus, a_out, b_out);
 
 		use_constant <= 1;
-
+		gate__alu_out <= 0;
+		
 		constant = 4;
 		a_we <= 1;
 		a_oe <= 0;
