@@ -1,3 +1,5 @@
+// `timescale 1s/1ms
+
 module register #(
     parameter WIDTH = 16
 ) (
@@ -33,7 +35,7 @@ endmodule
 
 module computer;
     reg clock = 0;
-    always #0.5 clock = ~clock;
+    always #1 clock = ~clock;
 
     wire [15:0] bus;
 
@@ -56,18 +58,17 @@ module computer;
 		$monitor("time=%0t bus=%b a_out=%b b_out=%b", $time, bus, a_out, b_out);
 
 		constant = 4;
-		use_constant = 1;
-		a_we = 1;
-		a_oe = 0;
-		b_we = 1;
-		b_oe = 0;
-		#1;
-		use_constant = 0;
-		#1;
-		a_we = 0;
-		a_oe = 1;
-		b_we = 0;
-		b_oe = 1;
+		use_constant <= 1;
+		a_we <= 1;
+		a_oe <= 0;
+		b_we <= 1;
+		b_oe <= 0;
+		#2;
+		use_constant <= 0;
+		a_we <= 0;
+		a_oe <= 1;
+		b_we <= 0;
+		b_oe <= 1;
 
 		#10 $finish;
 	end
