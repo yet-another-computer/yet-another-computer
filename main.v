@@ -1,5 +1,3 @@
-// `timescale 1s/1ms
-
 module register #(
     parameter WIDTH = 16
 ) (
