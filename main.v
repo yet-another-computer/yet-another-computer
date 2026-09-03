@@ -30,11 +30,25 @@ module ram #(
 endmodule
 
 module controller #(
-    parameter WIDTH = 8
+    parameter WIDTH = 8,
+    parameter GATE_NUM = 12
 ) (
     input  wire [WIDTH-1:0] command,
 
-    output wire gate__alu_out,
+    output wire _gate_ram_address,
+    output wire _gate_ram_value,
+    output wire _gate_ip,
+    output wire _gate_cmd,
+
+    output wire _gate_ram_address_we,
+    output wire _gate_ram_value_we,
+    output wire _gate_ip_we,
+    output wire _gate_cmd_we,
+
+    output wire _gate_ram_address_oe,
+    output wire _gate_ram_value_oe,
+    output wire _gate_ip_oe,
+    output wire _gate_cmds_oe,
 
     input wire clock
 );
@@ -46,12 +60,26 @@ module controller #(
     reg [7:0] pointer;
     assign pointer = { command[7:4], step };
 
-    reg [49:0] gate_table[2] = '{
-        'b101010101001,
-        'b000010101010
-    };
+    reg [GATE_NUM-1:0] gate_table[2**WIDTH];
+    initial begin
+        integer i;
+        for (i = 0; i < 2**WIDTH; i = i + 1)
+            gate_table[i] = {GATE_NUM{1'b0}};
+        gate_table[0] = 'b101010000010;
+    end
 
-    assign gate__alu_out = gate_table[pointer][0];
+    assign _gate_ram_address = gate_table[pointer][0];
+    assign _gate_ram_value = gate_table[pointer][1];
+    assign _gate_ip = gate_table[pointer][2];
+    assign _gate_cmd = gate_table[pointer][3];
+    assign _gate_ram_address_we = gate_table[pointer][4];
+    assign _gate_ram_value_we = gate_table[pointer][5];
+    assign _gate_ip_we = gate_table[pointer][6];
+    assign _gate_cmd_we = gate_table[pointer][7];
+    assign _gate_ram_address_oe = gate_table[pointer][8];
+    assign _gate_ram_value_oe = gate_table[pointer][9];
+    assign _gate_ip_oe = gate_table[pointer][10];
+    assign _gate_cmds_oe = gate_table[pointer][11];
 endmodule
 
 module computer;
@@ -60,52 +88,104 @@ module computer;
 
     wire [15:0] bus;
 
-    reg [15:0] constant;
-    reg use_constant;
-    
-    wire [15:0] a_out;
-    reg a_we;
-    reg a_oe;
-    register a(bus, a_out, a_we, a_oe, clock);
+    wire _gate_ram_address_we;
+    wire _gate_ram_address_oe;
+    wire [15:0] _reg_ram_address_in;
+    wire [15:0] _reg_ram_address_out;
+    register reg_ram_address(
+        _reg_ram_address_in,
+        _reg_ram_address_out,
+        _gate_ram_address_we,
+        _gate_ram_address_oe,
+        clock
+    );
 
-    wire [15:0] b_out;
-    reg b_we;
-    reg b_oe;
-    register b(bus, b_out, b_we, b_oe, clock);
+    wire _gate_ram_value_we;
+    wire _gate_ram_value_oe;
+    wire [7:0] _reg_ram_value_in;
+    wire [7:0] _reg_ram_value_out;
+    wire [7:0] __reg_ram_value_in;
+    register #(.WIDTH(8)) reg_ram_value(
+        __reg_ram_value_in,
+        _reg_ram_value_out,
+        _gate_ram_value_we,
+        _gate_ram_value_oe,
+        clock
+    );
 
-    wire [15:0] alu_out_;
-    alu alu(a_out, b_out, alu_out_, '1, '0);
+    wire [7:0] _reg_ram_value_inout;
+    ram ram(_reg_ram_address_out, _reg_ram_value_inout, '0, clock);
+    assign __reg_ram_value_in = _reg_ram_value_in[7:0] | _reg_ram_value_inout;
 
-    reg gate__alu_out;
-    wire [15:0] alu_out;
-    gate #(.WIDTH(16)) alu_out__bus(alu_out_, alu_out, gate__alu_out);
+    wire _gate_ip_we;
+    wire _gate_ip_oe;
+    wire [15:0] _reg_ip_in;
+    wire [15:0] _reg_ip_out;
+    register reg_ip(
+        _reg_ip_in,
+        _reg_ip_out,
+        _gate_ip_we,
+        _gate_ip_oe,
+        clock
+    );
 
-    assign bus = use_constant ? constant : (alu_out);
+    wire _gate_cmd_we;
+    wire _gate_cmds_oe;
+    wire [7:0] _reg_cmd_in;
+    wire [7:0] _reg_cmd_out;
+    register #(.WIDTH(8)) reg_cmd(
+        _reg_cmd_in,
+        _reg_cmd_out,
+        _gate_cmd_we,
+        _gate_cmds_oe,
+        clock
+    );
 
-	initial begin
-		$monitor("time=%0t bus=%b a_out=%b b_out=%b", $time, bus, a_out, b_out);
+    wire _gate_ram_address;
+    gate gate_ram_address(bus, _reg_ram_address_in, _gate_ram_address);
 
-		use_constant <= 1;
-		gate__alu_out <= 0;
-		
-		constant = 4;
-		a_we <= 1;
-		a_oe <= 0;
-		#2;
+    wire _gate_ram_value;
+    gate #(.WIDTH(8)) gate_ram_value(bus[7:0], _reg_ram_value_in, _gate_ram_value);
 
-		a_we <= 0;
-		a_oe <= 1;
+    wire _gate_ip;
+    gate gate_ip(bus, _reg_ip_in, _gate_ip);
 
-		constant = 42;
-		b_we <= 1;
-		b_oe <= 0;
-		#2;
+    wire _gate_cmd;
+    gate #(.WIDTH(8)) gate_cmd(bus[7:0], _reg_cmd_in, _gate_cmd);
 
-		b_we <= 0;
-		b_oe <= 1;
+    controller controller(
+        _reg_cmd_out,
 
-		use_constant <= 0;
+        _gate_ram_address,
+        _gate_ram_value,
+        _gate_ip,
+        _gate_cmd,
+        
+        _gate_ram_address_we,
+        _gate_ram_value_we,
+        _gate_ip_we,
+        _gate_cmd_we,
+        
+        _gate_ram_address_oe,
+        _gate_ram_value_oe,
+        _gate_ip_oe,
+        _gate_cmds_oe,
 
-		#10 $finish;
-	end
+        clock
+    );
+
+    assign bus[7:0] = _reg_ram_value_out | _reg_ip_out[7:0];
+    assign bus[15:8] = _reg_ip_out[15:8];
+
+   	initial begin
+        $monitor("time=%0t RAM_ADDR=%b RAM_VALUE=%b IP=%b CMD=%b",
+            $time,
+            _reg_ram_address_out,
+            _reg_ram_value_out,
+            _reg_ip_out,
+            _reg_cmd_out
+        );
+
+        #10 $finish;
+   	end
 endmodule
