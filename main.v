@@ -11,6 +11,24 @@ module alu #(
     assign out = op_plus ? (a + b) : (op_and ? a & b : 'z);
 endmodule
 
+module ram #(
+    parameter WIDTH = 16
+) (
+    input wire [WIDTH-1:0] address,
+    inout wire [7:0] value,
+
+    input wire write_flag,
+    input wire clock
+);
+    reg [7:0] memory[2**WIDTH];
+    assign value = write_flag ? memory[address] : 'z;
+
+    always @(posedge clock) begin
+        if (write_flag)
+            memory[address] <= value;
+    end
+endmodule
+
 module computer;
     reg clock = 0;
     always #1 clock = ~clock;
