@@ -60,15 +60,15 @@ module controller #(
             step <= step + 1;
     end
 
-    reg [7:0] pointer;
+    wire [7:0] pointer;
     assign pointer = { command[7:4], step };
 
     reg [GATE_NUM-1:0] gate_table[2**WIDTH];
     initial begin
         integer i;
         for (i = 0; i < 2**WIDTH; i = i + 1)
-            gate_table[i] = {GATE_NUM{1'b000000000000}};
-        gate_table[0] = 'b101010000010;
+            gate_table[i] = {GATE_NUM{1'b0}};
+        gate_table[0] = 'b10001000100;
     end
 
     assign _gate_ram_address = gate_table[pointer][0];
