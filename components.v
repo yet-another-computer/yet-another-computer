@@ -6,14 +6,16 @@ module register #(
 
     input  wire write_enabled,
     input  wire output_enabled,
-    input  wire clock
+    input  wire clock,
+    input  wire reset
 );
     reg [WIDTH-1:0] value;
 
-    always @(posedge clock) begin
-        if (write_enabled) begin
+    always @(posedge clock or posedge reset) begin
+        if (reset)
+            value <= 0;
+        if (write_enabled)
             value <= in;
-        end
     end
 
     assign out = output_enabled ? value : 'z;

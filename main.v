@@ -48,13 +48,16 @@ module controller #(
     output wire _gate_ram_address_oe,
     output wire _gate_ram_value_oe,
     output wire _gate_ip_oe,
-    output wire _gate_cmds_oe,
 
-    input wire clock
+    input wire clock,
+    input wire reset
 );
     reg [3:0] step;
-    always @(posedge clock) begin
-        step <= step + 1;
+    always @(posedge clock or posedge reset) begin
+        if (reset)
+            step <= 0;
+        if (clock)
+            step <= step + 1;
     end
 
     reg [7:0] pointer;
@@ -64,7 +67,7 @@ module controller #(
     initial begin
         integer i;
         for (i = 0; i < 2**WIDTH; i = i + 1)
-            gate_table[i] = {GATE_NUM{1'b0}};
+            gate_table[i] = {GATE_NUM{1'b000000000000}};
         gate_table[0] = 'b101010000010;
     end
 
@@ -79,12 +82,12 @@ module controller #(
     assign _gate_ram_address_oe = gate_table[pointer][8];
     assign _gate_ram_value_oe = gate_table[pointer][9];
     assign _gate_ip_oe = gate_table[pointer][10];
-    assign _gate_cmds_oe = gate_table[pointer][11];
 endmodule
 
 module computer;
     reg clock = 0;
     always #1 clock = ~clock;
+    reg reset = 0;
 
     wire [15:0] bus;
 
@@ -97,7 +100,8 @@ module computer;
         _reg_ram_address_out,
         _gate_ram_address_we,
         _gate_ram_address_oe,
-        clock
+        clock,
+        reset
     );
 
     wire _gate_ram_value_we;
@@ -110,7 +114,8 @@ module computer;
         _reg_ram_value_out,
         _gate_ram_value_we,
         _gate_ram_value_oe,
-        clock
+        clock,
+        reset
     );
 
     wire [7:0] _reg_ram_value_inout;
@@ -126,19 +131,20 @@ module computer;
         _reg_ip_out,
         _gate_ip_we,
         _gate_ip_oe,
-        clock
+        clock,
+        reset
     );
 
     wire _gate_cmd_we;
-    wire _gate_cmds_oe;
     wire [7:0] _reg_cmd_in;
     wire [7:0] _reg_cmd_out;
     register #(.WIDTH(8)) reg_cmd(
         _reg_cmd_in,
         _reg_cmd_out,
         _gate_cmd_we,
-        _gate_cmds_oe,
-        clock
+        '1,
+        clock,
+        reset
     );
 
     wire _gate_ram_address;
@@ -169,9 +175,9 @@ module computer;
         _gate_ram_address_oe,
         _gate_ram_value_oe,
         _gate_ip_oe,
-        _gate_cmds_oe,
 
-        clock
+        clock,
+        reset
     );
 
     assign bus[7:0] = _reg_ram_value_out | _reg_ip_out[7:0];
@@ -186,6 +192,11 @@ module computer;
             _reg_cmd_out
         );
 
+        reset <= 1;
+        #2;
+        reset <= 0;
+        #2;
+        
         #10 $finish;
    	end
 endmodule
