@@ -1,35 +1,15 @@
-module register #(
+module alu #(
     parameter WIDTH = 16
 ) (
-    input  wire [WIDTH-1:0] in,
-    output wire  [WIDTH-1:0] out,
+    input  wire [WIDTH-1:0] a,
+    input  wire [WIDTH-1:0] b,
+    output wire [WIDTH-1:0] out,
 
-    input  wire write_enabled,
-    input  wire output_enabled,
-    input  wire clock
+    input  wire op_plus,
+    input  wire op_and
 );
-    reg [WIDTH-1:0] value;
-
-    always @(posedge clock) begin
-        if (write_enabled) begin
-            value <= in;
-        end
-    end
-
-    assign out = output_enabled ? value : 'z;
+    assign out = op_plus ? (a + b) : (op_and ? a & b : 'z);
 endmodule
-
-module gate #(
-    parameter WIDTH
-) (
-    input  wire [WIDTH-1:0] in,
-    output wire  [WIDTH-1:0] out,
-
-    input  wire is_open
-);
-    assign out = is_open ? in : 'z;
-endmodule
-
 
 module computer;
     reg clock = 0;
@@ -50,23 +30,35 @@ module computer;
     reg b_oe;
     register b(bus, b_out, b_we, b_oe, clock);
 
-    assign bus = use_constant ? constant : (a_out + b_out);
+    wire [15:0] alu_out;
+    // reg gate__alu_out__bus;
+    alu alu(a_out, b_out, alu_out, '1, '0);
+    // gate #(.WIDTH(16)) alu_out__bus(alu_out, bus, gate__alu_out__bus);
+
+    assign bus = use_constant ? constant : (alu_out);
 
 	initial begin
 		$monitor("time=%0t bus=%b a_out=%b b_out=%b", $time, bus, a_out, b_out);
 
-		constant = 4;
 		use_constant <= 1;
+
+		constant = 4;
 		a_we <= 1;
 		a_oe <= 0;
+		#2;
+
+		a_we <= 0;
+		a_oe <= 1;
+
+		constant = 42;
 		b_we <= 1;
 		b_oe <= 0;
 		#2;
-		use_constant <= 0;
-		a_we <= 0;
-		a_oe <= 1;
+
 		b_we <= 0;
 		b_oe <= 1;
+
+		use_constant <= 0;
 
 		#10 $finish;
 	end

@@ -1,7 +1,7 @@
 
 .PHONY: build
 build:
-	iverilog -g2012 -o a.out main.v
+	iverilog -g2012 -o a.out main.v components.v
 
 .PHONY: run
 run: build
