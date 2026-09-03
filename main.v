@@ -21,7 +21,7 @@ module ram #(
     input wire clock
 );
     reg [7:0] memory[2**WIDTH];
-    assign value = write_flag ? memory[address] : 'z;
+    assign value = write_flag ? 'z : memory[address];
 
     always @(posedge clock) begin
         if (write_flag)
