@@ -29,6 +29,31 @@ module ram #(
     end
 endmodule
 
+module controller #(
+    parameter WIDTH = 8
+) (
+    input  wire [WIDTH-1:0] command,
+
+    output wire gate__alu_out,
+
+    input wire clock
+);
+    reg [3:0] step;
+    always @(posedge clock) begin
+        step <= step + 1;
+    end
+
+    reg [7:0] pointer;
+    assign pointer = { command[7:4], step };
+
+    reg [49:0] gate_table[2] = '{
+        'b101010101001,
+        'b000010101010
+    };
+
+    assign gate__alu_out = gate_table[pointer][0];
+endmodule
+
 module computer;
     reg clock = 0;
     always #1 clock = ~clock;
