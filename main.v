@@ -62,6 +62,8 @@ module controller #(
 
     output wire _gate__alu_out__bus__signal,
 
+    output wire _gate_halt,
+
     input wire clock,
     input wire reset
 );
@@ -89,22 +91,30 @@ module controller #(
     localparam ALU_OP_PLUS                   = 32'b0000001000000000000;
     localparam ALU_OP_AND                    = 32'b0000010000000000000;
     localparam ALU_OUT__BUS__SIGNAL          = 32'b0000100000000000000;
-
-    localparam INSTRUCTION_COUNT = 16;
+    localparam HALT                          = 32'b0001000000000000000;
     
+    reg [7:0] INSTRUCTION_COUNT = 16;
+
     reg [32-1:0] gate_table[2**WIDTH];
     initial begin
         integer i;
         for (i = 0; i < 2**WIDTH; i = i + 1)
             gate_table[i] = 32'b0;
 
+        /// Instruction fetch
         gate_table[4'b0000 * INSTRUCTION_COUNT + 0] = IP_OE | RAM_ADDRESS_WE;
         gate_table[4'b0000 * INSTRUCTION_COUNT + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
         gate_table[4'b0000 * INSTRUCTION_COUNT + 2] = RAM_VALUE_OE | CMD_WE;
 
+        /// 
         gate_table[4'b0001 * INSTRUCTION_COUNT + 0] = A_OE | ALU_OP_AND | ALU_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
         gate_table[4'b0001 * INSTRUCTION_COUNT + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
         gate_table[4'b0001 * INSTRUCTION_COUNT + 2] = RAM_VALUE_OE | A_WE;
+
+
+        /// Halt
+        gate_table[4'b1111 * INSTRUCTION_COUNT + 0] = HALT;
+
     end
 
     wire [7:0] pointer;
@@ -125,12 +135,20 @@ module controller #(
     assign _gate_alu_op_plus                    = gate_table[pointer][12];
     assign _gate_alu_op_and                     = gate_table[pointer][13];
     assign _gate__alu_out__bus__signal          = gate_table[pointer][14];
+    assign _gate_halt                           = gate_table[pointer][15];
 endmodule
 
 module computer;
+    wire _gate_halt;
+
     reg clock = 0;
-    always #1 clock = ~clock;
     reg reset = 0;
+    always begin
+        if (!_gate_halt)
+            #1 clock = ~clock;
+        else
+            #1;
+    end
 
     wire [15:0] bus;
 
@@ -258,6 +276,8 @@ module computer;
 
         _gate__alu_out__bus__signal,
 
+        _gate_halt,
+
         clock,
         reset
     );
@@ -290,6 +310,6 @@ module computer;
         reset <= 0;
         #2;
 
-        #10 $finish;
+        #100 $finish;
    	end
 endmodule
