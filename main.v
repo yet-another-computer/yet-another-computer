@@ -27,18 +27,17 @@ module ram #(
         if (write_flag)
             memory[address] <= value;
     end
+
+    initial begin
+        $readmemh("initram.hex", memory, 0, 15);
+    end
 endmodule
 
 module controller #(
-    parameter WIDTH = 8,
-    parameter GATE_NUM = 12
+    parameter WIDTH = 8
 ) (
     input  wire [WIDTH-1:0] command,
-
-    output wire _gate_ram_address,
-    output wire _gate_ram_value,
-    output wire _gate_ip,
-    output wire _gate_cmd,
+    output reg [3:0] step,
 
     output wire _gate_ram_address_we,
     output wire _gate_ram_value_we,
@@ -49,39 +48,52 @@ module controller #(
     output wire _gate_ram_value_oe,
     output wire _gate_ip_oe,
 
+    output wire _gate__bus__reg_ram_value_in__signal,
+
     input wire clock,
     input wire reset
 );
-    reg [3:0] step;
+    // NOTE: For debug purposes
+    // reg [3:0] step;
     always @(posedge clock or posedge reset) begin
         if (reset)
             step <= 0;
-        if (clock)
+        else
             step <= step + 1;
+    end
+
+
+    localparam RAM_ADDRESS_WE                = 8'b00000001;
+    localparam RAM_VALUE_WE                  = 8'b00000010;
+    localparam IP_WE                         = 8'b00000100;
+    localparam CMD_WE                        = 8'b00001000;
+    localparam RAM_ADDRESS_OE                = 8'b00010000;
+    localparam RAM_VALUE_OE                  = 8'b00100000;
+    localparam IP_OE                         = 8'b01000000;
+    localparam BUS__REG_RAM_VALUE_IN__SIGNAL = 8'b10000000;
+
+    reg [8-1:0] gate_table[2**WIDTH];
+    initial begin
+        integer i;
+        for (i = 0; i < 2**WIDTH; i = i + 1)
+            gate_table[i] = 8'b0;
+
+        gate_table[0] = IP_OE | RAM_ADDRESS_WE;
+        gate_table[1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
+        gate_table[2] = RAM_VALUE_OE | CMD_WE;
     end
 
     wire [7:0] pointer;
     assign pointer = { command[7:4], step };
 
-    reg [GATE_NUM-1:0] gate_table[2**WIDTH];
-    initial begin
-        integer i;
-        for (i = 0; i < 2**WIDTH; i = i + 1)
-            gate_table[i] = {GATE_NUM{1'b0}};
-        gate_table[0] = 'b10001000100;
-    end
-
-    assign _gate_ram_address = gate_table[pointer][0];
-    assign _gate_ram_value = gate_table[pointer][1];
-    assign _gate_ip = gate_table[pointer][2];
-    assign _gate_cmd = gate_table[pointer][3];
-    assign _gate_ram_address_we = gate_table[pointer][4];
-    assign _gate_ram_value_we = gate_table[pointer][5];
-    assign _gate_ip_we = gate_table[pointer][6];
-    assign _gate_cmd_we = gate_table[pointer][7];
-    assign _gate_ram_address_oe = gate_table[pointer][8];
-    assign _gate_ram_value_oe = gate_table[pointer][9];
-    assign _gate_ip_oe = gate_table[pointer][10];
+    assign _gate_ram_address_we                 = gate_table[pointer][0];
+    assign _gate_ram_value_we                   = gate_table[pointer][1];
+    assign _gate_ip_we                          = gate_table[pointer][2];
+    assign _gate_cmd_we                         = gate_table[pointer][3];
+    assign _gate_ram_address_oe                 = gate_table[pointer][4];
+    assign _gate_ram_value_oe                   = gate_table[pointer][5];
+    assign _gate_ip_oe                          = gate_table[pointer][6];
+    assign _gate__bus__reg_ram_value_in__signal = gate_table[pointer][7];
 endmodule
 
 module computer;
@@ -93,10 +105,9 @@ module computer;
 
     wire _gate_ram_address_we;
     wire _gate_ram_address_oe;
-    wire [15:0] _reg_ram_address_in;
     wire [15:0] _reg_ram_address_out;
     register reg_ram_address(
-        _reg_ram_address_in,
+        bus,
         _reg_ram_address_out,
         _gate_ram_address_we,
         _gate_ram_address_oe,
@@ -118,16 +129,22 @@ module computer;
         reset
     );
 
+    wire _gate__bus__reg_ram_value_in__signal;
+    gate #(.WIDTH(8)) _gate__bus__reg_ram_value_in(
+        bus[7:0],
+        _reg_ram_value_in,
+        _gate__bus__reg_ram_value_in__signal
+    );
+
     wire [7:0] _reg_ram_value_inout;
     ram ram(_reg_ram_address_out, _reg_ram_value_inout, '0, clock);
-    assign __reg_ram_value_in = _reg_ram_value_in[7:0] | _reg_ram_value_inout;
+    assign __reg_ram_value_in = _gate__bus__reg_ram_value_in__signal ? _reg_ram_value_in : _reg_ram_value_inout;
 
     wire _gate_ip_we;
     wire _gate_ip_oe;
-    wire [15:0] _reg_ip_in;
     wire [15:0] _reg_ip_out;
     register reg_ip(
-        _reg_ip_in,
+        bus,
         _reg_ip_out,
         _gate_ip_we,
         _gate_ip_oe,
@@ -136,10 +153,9 @@ module computer;
     );
 
     wire _gate_cmd_we;
-    wire [7:0] _reg_cmd_in;
     wire [7:0] _reg_cmd_out;
     register #(.WIDTH(8)) reg_cmd(
-        _reg_cmd_in,
+        bus[7:0],
         _reg_cmd_out,
         _gate_cmd_we,
         '1,
@@ -147,26 +163,11 @@ module computer;
         reset
     );
 
-    wire _gate_ram_address;
-    gate gate_ram_address(bus, _reg_ram_address_in, _gate_ram_address);
-
-    wire _gate_ram_value;
-    gate #(.WIDTH(8)) gate_ram_value(bus[7:0], _reg_ram_value_in, _gate_ram_value);
-
-    wire _gate_ip;
-    gate gate_ip(bus, _reg_ip_in, _gate_ip);
-
-    wire _gate_cmd;
-    gate #(.WIDTH(8)) gate_cmd(bus[7:0], _reg_cmd_in, _gate_cmd);
-
+    wire [3:0] step;
     controller controller(
         _reg_cmd_out,
-
-        _gate_ram_address,
-        _gate_ram_value,
-        _gate_ip,
-        _gate_cmd,
-        
+        step,
+       
         _gate_ram_address_we,
         _gate_ram_value_we,
         _gate_ip_we,
@@ -176,16 +177,25 @@ module computer;
         _gate_ram_value_oe,
         _gate_ip_oe,
 
+        _gate__bus__reg_ram_value_in__signal,
+
         clock,
         reset
     );
 
-    assign bus[7:0] = _reg_ram_value_out | _reg_ip_out[7:0];
-    assign bus[15:8] = _reg_ip_out[15:8];
+    assign bus =
+                _gate_ip_oe ?
+                    _reg_ip_out :
+                _gate_ram_value_oe ?
+                    {8'bx, _reg_ram_value_out} :
+                16'bx;
 
    	initial begin
-        $monitor("time=%0t RAM_ADDR=%b RAM_VALUE=%b IP=%b CMD=%b",
+        $monitor("TICK=%0t STEP=%0d RESET=%b BUS=%b RAM_ADDR=%b RAM_VALUE=%b IP=%b CMD=%b",
             $time,
+            step,
+            reset,
+            bus,
             _reg_ram_address_out,
             _reg_ram_value_out,
             _reg_ip_out,
@@ -196,7 +206,7 @@ module computer;
         #2;
         reset <= 0;
         #2;
-        
+
         #10 $finish;
    	end
 endmodule
