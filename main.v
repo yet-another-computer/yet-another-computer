@@ -64,6 +64,8 @@ module controller #(
 
     output wire _gate_halt,
 
+    output wire _gate_ip_inc,
+
     input wire clock,
     input wire reset
 );
@@ -92,6 +94,7 @@ module controller #(
     localparam ALU_OP_AND                    = 32'b0000010000000000000;
     localparam ALU_OUT__BUS__SIGNAL          = 32'b0000100000000000000;
     localparam HALT                          = 32'b0001000000000000000;
+    localparam IP_INC                        = 32'b0010000000000000000;
     
     reg [7:0] INSTRUCTION_COUNT = 16;
 
@@ -103,10 +106,10 @@ module controller #(
 
         /// Instruction fetch
         gate_table[4'b0000 * INSTRUCTION_COUNT + 0] = IP_OE | RAM_ADDRESS_WE;
-        gate_table[4'b0000 * INSTRUCTION_COUNT + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
+        gate_table[4'b0000 * INSTRUCTION_COUNT + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE | IP_INC;
         gate_table[4'b0000 * INSTRUCTION_COUNT + 2] = RAM_VALUE_OE | CMD_WE;
 
-        /// 
+        /// A <- mem[A]
         gate_table[4'b0001 * INSTRUCTION_COUNT + 0] = A_OE | ALU_OP_AND | ALU_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
         gate_table[4'b0001 * INSTRUCTION_COUNT + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
         gate_table[4'b0001 * INSTRUCTION_COUNT + 2] = RAM_VALUE_OE | A_WE;
@@ -136,6 +139,7 @@ module controller #(
     assign _gate_alu_op_and                     = gate_table[pointer][13];
     assign _gate__alu_out__bus__signal          = gate_table[pointer][14];
     assign _gate_halt                           = gate_table[pointer][15];
+    assign _gate_ip_inc                         = gate_table[pointer][16];
 endmodule
 
 module computer;
@@ -191,12 +195,14 @@ module computer;
 
     wire _gate_ip_we;
     wire _gate_ip_oe;
+    wire _gate_ip_inc;
     wire [15:0] _reg_ip_out;
-    register reg_ip(
+    counter reg_ip(
         bus,
         _reg_ip_out,
         _gate_ip_we,
         _gate_ip_oe,
+        _gate_ip_inc,
         clock,
         reset
     );
@@ -278,6 +284,8 @@ module computer;
 
         _gate_halt,
 
+        _gate_ip_inc,
+
         clock,
         reset
     );
@@ -299,7 +307,7 @@ module computer;
             bus,
             _reg_ram_address_out,
             _reg_ram_value_out,
-            _reg_ip_out,
+            reg_ip.value,
             _reg_cmd_out,
             _reg_a_out,
             _reg_b_out
