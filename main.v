@@ -38,7 +38,6 @@ module controller #(
     parameter WIDTH = 8
 ) (
     input  wire [WIDTH-1:0] command,
-    output reg [3:0] step,
 
     output wire _gate_ram_address_we,
     output wire _gate_ram_value_we,
@@ -69,15 +68,6 @@ module controller #(
     input wire clock,
     input wire reset
 );
-    // NOTE: For debug purposes
-    // reg [3:0] step;
-    always @(posedge clock or posedge reset) begin
-        if (reset || _gate_cmd_we)
-            step <= 0;
-        else
-            step <= step + 1;
-    end
-
     localparam RAM_ADDRESS_WE                = 32'b0000000000000000001;
     localparam RAM_VALUE_WE                  = 32'b0000000000000000010;
     localparam IP_WE                         = 32'b0000000000000000100;
@@ -95,51 +85,70 @@ module controller #(
     localparam ALU_OUT__BUS__SIGNAL          = 32'b0000100000000000000;
     localparam HALT                          = 32'b0001000000000000000;
     localparam IP_INC                        = 32'b0010000000000000000;
-    
-    reg [7:0] INSTRUCTION_COUNT = 16;
 
-    reg [32-1:0] gate_table[2**WIDTH];
+    reg [32-1:0] instruction_microcode[2**WIDTH];
+    reg [32-1:0] instruction_microcode_len[16];
     initial begin
         integer i;
         for (i = 0; i < 2**WIDTH; i = i + 1)
-            gate_table[i] = 32'b0;
+            instruction_microcode[i] = 32'b0;
 
-        /// Instruction fetch
-        gate_table[4'b0000 * INSTRUCTION_COUNT + 0] = IP_OE | RAM_ADDRESS_WE;
-        gate_table[4'b0000 * INSTRUCTION_COUNT + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE | IP_INC;
-        gate_table[4'b0000 * INSTRUCTION_COUNT + 2] = RAM_VALUE_OE | CMD_WE;
-
+        /// No-op
+        instruction_microcode_len[4'b0000] = 0;
+        
         /// A <- mem[A]
-        gate_table[4'b0001 * INSTRUCTION_COUNT + 0] = A_OE | ALU_OP_AND | ALU_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
-        gate_table[4'b0001 * INSTRUCTION_COUNT + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
-        gate_table[4'b0001 * INSTRUCTION_COUNT + 2] = RAM_VALUE_OE | A_WE;
-
+        instruction_microcode[4'b0001 * 16 + 0] = A_OE | ALU_OP_AND | ALU_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
+        instruction_microcode[4'b0001 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
+        instruction_microcode[4'b0001 * 16 + 2] = RAM_VALUE_OE | A_WE;
+        instruction_microcode_len[4'b0001] = 3;
 
         /// Halt
-        gate_table[4'b1111 * INSTRUCTION_COUNT + 0] = HALT;
+        instruction_microcode[4'b1111 * 16 + 0] = HALT;
+        instruction_microcode_len[4'b1111] = 1;
+    end
+    
+    wire [32-1:0] gates_output;
 
+    wire [3:0] command_id; 
+    assign command_id = command[7:4];
+
+    reg [3:0] step = 0;
+    always @(posedge clock or posedge reset) begin
+        if (reset)
+            step <= 0;
+        else begin
+            if (step == instruction_microcode_len[command_id] + 3)
+                step <= 0;
+            else
+                step <= step + 1;
+        end
     end
 
-    wire [7:0] pointer;
-    assign pointer = { command[7:4], step };
+    assign gates_output =
+        /// Instruction fetch
+        step == 0 ? IP_OE | RAM_ADDRESS_WE :
+        step == 1 ? RAM_ADDRESS_OE | RAM_VALUE_WE | IP_INC :
+        step == 2 ? RAM_VALUE_OE | CMD_WE :
+        /// Instruction execution
+        instruction_microcode[{ command_id, step - 2'd3 }];
 
-    assign _gate_ram_address_we                 = gate_table[pointer][0];
-    assign _gate_ram_value_we                   = gate_table[pointer][1];
-    assign _gate_ip_we                          = gate_table[pointer][2];
-    assign _gate_cmd_we                         = gate_table[pointer][3];
-    assign _gate_ram_address_oe                 = gate_table[pointer][4];
-    assign _gate_ram_value_oe                   = gate_table[pointer][5];
-    assign _gate_ip_oe                          = gate_table[pointer][6];
-    assign _gate__bus__reg_ram_value_in__signal = gate_table[pointer][7];
-    assign _gate_a_we                           = gate_table[pointer][8];
-    assign _gate_a_oe                           = gate_table[pointer][9];
-    assign _gate_b_we                           = gate_table[pointer][10];
-    assign _gate_b_oe                           = gate_table[pointer][11];
-    assign _gate_alu_op_plus                    = gate_table[pointer][12];
-    assign _gate_alu_op_and                     = gate_table[pointer][13];
-    assign _gate__alu_out__bus__signal          = gate_table[pointer][14];
-    assign _gate_halt                           = gate_table[pointer][15];
-    assign _gate_ip_inc                         = gate_table[pointer][16];
+    assign _gate_ram_address_we                 = gates_output[0];
+    assign _gate_ram_value_we                   = gates_output[1];
+    assign _gate_ip_we                          = gates_output[2];
+    assign _gate_cmd_we                         = gates_output[3];
+    assign _gate_ram_address_oe                 = gates_output[4];
+    assign _gate_ram_value_oe                   = gates_output[5];
+    assign _gate_ip_oe                          = gates_output[6];
+    assign _gate__bus__reg_ram_value_in__signal = gates_output[7];
+    assign _gate_a_we                           = gates_output[8];
+    assign _gate_a_oe                           = gates_output[9];
+    assign _gate_b_we                           = gates_output[10];
+    assign _gate_b_oe                           = gates_output[11];
+    assign _gate_alu_op_plus                    = gates_output[12];
+    assign _gate_alu_op_and                     = gates_output[13];
+    assign _gate__alu_out__bus__signal          = gates_output[14];
+    assign _gate_halt                           = gates_output[15];
+    assign _gate_ip_inc                         = gates_output[16];
 endmodule
 
 module computer;
@@ -255,10 +264,8 @@ module computer;
         _gate__alu_out__bus__signal
     );
     
-    wire [3:0] step;
     controller controller(
         _reg_cmd_out,
-        step,
        
         _gate_ram_address_we,
         _gate_ram_value_we,
@@ -302,12 +309,12 @@ module computer;
    	initial begin
         $monitor("TICK=%0t STEP=%0d RESET=%b BUS=%h RAM_ADDR=%h RAM_VALUE=%h IP=%h CMD=%h A=%h B=%h",
             $time,
-            step,
+            controller.step,
             reset,
             bus,
             _reg_ram_address_out,
             _reg_ram_value_out,
-            reg_ip.value,
+            _reg_ip_out,
             _reg_cmd_out,
             _reg_a_out,
             _reg_b_out
@@ -318,6 +325,6 @@ module computer;
         reset <= 0;
         #2;
 
-        #100 $finish;
+        #50 $finish;
    	end
 endmodule
