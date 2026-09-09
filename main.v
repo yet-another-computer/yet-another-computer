@@ -1,15 +1,23 @@
 module alu #(
     parameter WIDTH = 16
 ) (
-    input  wire [WIDTH-1:0] a,
-    input  wire [WIDTH-1:0] b,
-    output wire [WIDTH-1:0] out,
+    input  logic [WIDTH-1:0] a,
+    input  logic [WIDTH-1:0] b,
+    output logic [WIDTH-1:0] out,
 
-    input  wire op_plus,
-    input  wire op_and
+    input  logic op_plus,
+    input  logic op_and,
+
+    output logic flag_zero
 );
-    // NOTE: OP_AND IS USED FOR DEBUG PURPOSES FOR NOW
-    assign out = op_plus ? (a + b) : (op_and ? a : 'z);
+    always @(*) begin
+        if (op_plus)
+            out = a + b;
+        if (op_and)
+            out = a & b;
+    end
+
+    assign flag_zero = (out == 0);
 endmodule
 
 module ram #(
@@ -38,6 +46,7 @@ module controller #(
     parameter WIDTH = 8
 ) (
     input  wire [WIDTH-1:0] command,
+    input  wire _alu_flag_zero,
 
     output wire _gate_ram_address_we,
     output wire _gate_ram_value_we,
@@ -104,13 +113,20 @@ module controller #(
         instruction_microcode[4'b0001 * 16 + 2] = RAM_VALUE_OE | A_WE;
         instruction_microcode_len[4'b0001] = 3;
 
+        /// Jump Zero
+        instruction_name[4'b0010] = "JZ";
+        instruction_microcode[4'b0010 * 16 + 0] = IP_OE | RAM_ADDRESS_WE;
+        instruction_microcode[4'b0010 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
+        instruction_microcode[4'b0010 * 16 + 2] = RAM_VALUE_OE | IP_WE | IP_INC;
+        instruction_microcode_len[4'b0010] = 3;
+
         /// Halt
         instruction_name[4'b1111] = "HALT";
         instruction_microcode[4'b1111 * 16 + 0] = HALT;
         instruction_microcode_len[4'b1111] = 1;
     end
 
-    wire [32-1:0] gates_output;
+    logic [32-1:0] gates_output;
 
     wire [3:0] command_id; 
     assign command_id = command[7:4];
@@ -127,13 +143,19 @@ module controller #(
         end
     end
 
-    assign gates_output =
-        /// Instruction fetch
-        step == 0 ? IP_OE | RAM_ADDRESS_WE :
-        step == 1 ? RAM_ADDRESS_OE | RAM_VALUE_WE | IP_INC :
-        step == 2 ? RAM_VALUE_OE | CMD_WE :
-        /// Instruction execution
-        instruction_microcode[{ command_id, step - 2'd3 }];
+    always @(*) begin
+        case (step)
+            0: gates_output = IP_OE | RAM_ADDRESS_WE;
+            1: gates_output = RAM_ADDRESS_OE | RAM_VALUE_WE | IP_INC;
+            2: gates_output = RAM_VALUE_OE | CMD_WE;
+            default: begin
+                if (command_id == 4'b0010 && !_alu_flag_zero)
+                    gates_output = IP_INC;
+                else
+                    gates_output = instruction_microcode[{command_id, step - 2'd3}];
+            end
+        endcase
+    end
 
     assign _gate_ram_address_we                 = gates_output[0];
     assign _gate_ram_value_we                   = gates_output[1];
@@ -257,7 +279,8 @@ module computer;
     wire [15:0] _alu_out;
     wire _gate_alu_op_plus;
     wire _gate_alu_op_and;
-    alu alu(_reg_a_out, _reg_b_out, _alu_out, _gate_alu_op_plus, _gate_alu_op_and);
+    wire _alu_flag_zero;
+    alu alu(_reg_a_out, _reg_b_out, _alu_out, _gate_alu_op_plus, _gate_alu_op_and, _alu_flag_zero);
 
     wire _gate__alu_out__bus__signal;
     wire [15:0] _alu_out_bus;
@@ -269,7 +292,9 @@ module computer;
     
     controller controller(
         _reg_cmd_out,
-       
+
+        _alu_flag_zero,
+
         _gate_ram_address_we,
         _gate_ram_value_we,
         _gate_ip_we,
