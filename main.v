@@ -86,6 +86,7 @@ module controller #(
     localparam HALT                          = 32'b0001000000000000000;
     localparam IP_INC                        = 32'b0010000000000000000;
 
+    reg [8*4:0] instruction_name[16];
     reg [32-1:0] instruction_microcode[2**WIDTH];
     reg [32-1:0] instruction_microcode_len[16];
     initial begin
@@ -94,8 +95,9 @@ module controller #(
             instruction_microcode[i] = 32'b0;
 
         /// No-op
+        instruction_name[4'b0000] = "NOOP";
         instruction_microcode_len[4'b0000] = 0;
-        
+
         /// A <- mem[A]
         instruction_microcode[4'b0001 * 16 + 0] = A_OE | ALU_OP_AND | ALU_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
         instruction_microcode[4'b0001 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
@@ -103,10 +105,11 @@ module controller #(
         instruction_microcode_len[4'b0001] = 3;
 
         /// Halt
+        instruction_name[4'b1111] = "HALT";
         instruction_microcode[4'b1111 * 16 + 0] = HALT;
         instruction_microcode_len[4'b1111] = 1;
     end
-    
+
     wire [32-1:0] gates_output;
 
     wire [3:0] command_id; 
@@ -306,8 +309,14 @@ module computer;
                     _alu_out_bus :
                 16'bx;
 
+    reg [32:0] current_instruction_name;
+    always @(*) begin
+        current_instruction_name = controller.instruction_name[_reg_cmd_out[7:4]];
+    end
+
    	initial begin
-        $monitor("TICK=%0t STEP=%0d RESET=%b BUS=%h RAM_ADDR=%h RAM_VALUE=%h IP=%h CMD=%h A=%h B=%h",
+        
+        $monitor("TICK=%0t STEP=%0d RESET=%b BUS=%h RAM_ADDR=%h RAM_VALUE=%h IP=%h CMD=%h A=%h B=%h (%0s)",
             $time,
             controller.step,
             reset,
@@ -317,7 +326,8 @@ module computer;
             _reg_ip_out,
             _reg_cmd_out,
             _reg_a_out,
-            _reg_b_out
+            _reg_b_out,
+            current_instruction_name
         );
 
         reset <= 1;
