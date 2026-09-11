@@ -6,7 +6,8 @@ module alu #(
     output logic [WIDTH-1:0] out,
 
     input  logic op_plus,
-    input  logic op_and,
+    input  logic op_lshift,
+    input  logic op_rshift,
     input  logic op_inc,
 
     output logic flag_zero
@@ -14,8 +15,10 @@ module alu #(
     always @(*) begin
         if (op_plus)
             out = a + b;
-        if (op_and)
+        if (op_lshift)
             out = a << 8;
+        if (op_rshift)
+            out = a >> 8;
         if (op_inc)
             out = a + 1;
     end
@@ -69,7 +72,7 @@ module controller #(
     output wire _gate_b_oe,
 
     output wire _gate_alu_op_plus,
-    output wire _gate_alu_op_and,
+    output wire _gate_alu_op_lshift,
 
     output wire _gate__alu_out__bus__signal,
 
@@ -87,32 +90,35 @@ module controller #(
 
     output wire _gate__reg_ram_value_out__bus__signal,
 
+    output wire _gate_alu_op_rshift,
+
     input wire clock,
     input wire reset
 );
-    localparam RAM_ADDRESS_WE                = 32'b0000000000000000000000001;
-    localparam RAM_VALUE_WE                  = 32'b0000000000000000000000010;
-    localparam IP_WE                         = 32'b0000000000000000000000100;
-    localparam CMD_WE                        = 32'b0000000000000000000001000;
-    localparam RAM_ADDRESS_OE                = 32'b0000000000000000000010000;
-    localparam RAM_VALUE_OE                  = 32'b0000000000000000000100000;
-    localparam IP_OE                         = 32'b0000000000000000001000000;
-    localparam BUS__REG_RAM_VALUE_IN__SIGNAL = 32'b0000000000000000010000000;
-    localparam A_WE                          = 32'b0000000000000000100000000;
-    localparam A_OE                          = 32'b0000000000000001000000000;
-    localparam B_WE                          = 32'b0000000000000010000000000;
-    localparam B_OE                          = 32'b0000000000000100000000000;
-    localparam ALU_OP_PLUS                   = 32'b0000000000001000000000000;
-    localparam ALU_OP_AND                    = 32'b0000000000010000000000000;
-    localparam ALU_OUT__BUS__SIGNAL          = 32'b0000000000100000000000000;
-    localparam HALT                          = 32'b0000000001000000000000000;
-    localparam IP_INC                        = 32'b0000000010000000000000000;
-    localparam MUX1_CHOICE                   = 32'b0000000100000000000000000;
-    localparam MUX2_CHOICE                   = 32'b0000001000000000000000000;
-    localparam REG_A_OUT__BUS__SIGNAL        = 32'b0000010000000000000000000;
-    localparam REG_B_OUT__BUS__SIGNAL        = 32'b0000100000000000000000000;
-    localparam ALU_OP_INC                    = 32'b0001000000000000000000000;
-    localparam REG_RAM_VALUE_OUT__BUS__SIGNAL= 32'b0010000000000000000000000;
+    localparam RAM_ADDRESS_WE                 = 32'b0000000000000000000000001;
+    localparam RAM_VALUE_WE                   = 32'b0000000000000000000000010;
+    localparam IP_WE                          = 32'b0000000000000000000000100;
+    localparam CMD_WE                         = 32'b0000000000000000000001000;
+    localparam RAM_ADDRESS_OE                 = 32'b0000000000000000000010000;
+    localparam RAM_VALUE_OE                   = 32'b0000000000000000000100000;
+    localparam IP_OE                          = 32'b0000000000000000001000000;
+    localparam BUS__REG_RAM_VALUE_IN__SIGNAL  = 32'b0000000000000000010000000;
+    localparam A_WE                           = 32'b0000000000000000100000000;
+    localparam A_OE                           = 32'b0000000000000001000000000;
+    localparam B_WE                           = 32'b0000000000000010000000000;
+    localparam B_OE                           = 32'b0000000000000100000000000;
+    localparam ALU_OP_PLUS                    = 32'b0000000000001000000000000;
+    localparam ALU_OP_LSHIFT                  = 32'b0000000000010000000000000;
+    localparam ALU_OUT__BUS__SIGNAL           = 32'b0000000000100000000000000;
+    localparam HALT                           = 32'b0000000001000000000000000;
+    localparam IP_INC                         = 32'b0000000010000000000000000;
+    localparam MUX1_CHOICE                    = 32'b0000000100000000000000000;
+    localparam MUX2_CHOICE                    = 32'b0000001000000000000000000;
+    localparam REG_A_OUT__BUS__SIGNAL         = 32'b0000010000000000000000000;
+    localparam REG_B_OUT__BUS__SIGNAL         = 32'b0000100000000000000000000;
+    localparam ALU_OP_INC                     = 32'b0001000000000000000000000;
+    localparam REG_RAM_VALUE_OUT__BUS__SIGNAL = 32'b0010000000000000000000000;
+    localparam ALU_OP_RLSHIFT                 = 32'b0100000000000000000000000;
 
     reg [8*4:0] instruction_name[16];
     reg [32-1:0] instruction_microcode[2**WIDTH];
@@ -132,7 +138,7 @@ module controller #(
         instruction_microcode[4'b0001 * 16 + 0] = RAM_ADDRESS_WE;
         instruction_microcode[4'b0001 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
         instruction_microcode[4'b0001 * 16 + 2] = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL;
-        instruction_microcode[4'b0001 * 16 + 3] = ALU_OP_AND | ALU_OUT__BUS__SIGNAL;
+        instruction_microcode[4'b0001 * 16 + 3] = ALU_OP_LSHIFT | ALU_OUT__BUS__SIGNAL;
         instruction_microcode[4'b0001 * 16 + 4] = ALU_OP_INC | ALU_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
         instruction_microcode[4'b0001 * 16 + 5] = RAM_ADDRESS_OE | RAM_VALUE_WE;
         instruction_microcode[4'b0001 * 16 + 6] = RAM_VALUE_OE | MUX2_CHOICE | ALU_OP_PLUS | ALU_OUT__BUS__SIGNAL;
@@ -210,29 +216,30 @@ module controller #(
         endcase
     end
 
-    assign _gate_ram_address_we                 = gates_output[0];
-    assign _gate_ram_value_we                   = gates_output[1];
-    assign _gate_ip_we                          = gates_output[2];
-    assign _gate_cmd_we                         = gates_output[3];
-    assign _gate_ram_address_oe                 = gates_output[4];
-    assign _gate_ram_value_oe                   = gates_output[5];
-    assign _gate_ip_oe                          = gates_output[6];
-    assign _gate__bus__reg_ram_value_in__signal = gates_output[7];
-    assign _gate_a_we                           = gates_output[8];
-    assign _gate_a_oe                           = gates_output[9];
-    assign _gate_b_we                           = gates_output[10];
-    assign _gate_b_oe                           = gates_output[11];
-    assign _gate_alu_op_plus                    = gates_output[12];
-    assign _gate_alu_op_and                     = gates_output[13];
-    assign _gate__alu_out__bus__signal          = gates_output[14];
-    assign _gate_halt                           = gates_output[15];
-    assign _gate_ip_inc                         = gates_output[16];
-    assign _gate_mux1_choice                    = gates_output[17];
-    assign _gate_mux2_choice                    = gates_output[18];
-    assign _gate__reg_a_out__bus__signal        = gates_output[19];
-    assign _gate__reg_b_out__bus__signal        = gates_output[20];
-    assign _gate_alu_op_inc                     = gates_output[21];
-    assign _gate__reg_ram_value_out__bus__signal= gates_output[22];
+    assign _gate_ram_address_we                  = gates_output[0];
+    assign _gate_ram_value_we                    = gates_output[1];
+    assign _gate_ip_we                           = gates_output[2];
+    assign _gate_cmd_we                          = gates_output[3];
+    assign _gate_ram_address_oe                  = gates_output[4];
+    assign _gate_ram_value_oe                    = gates_output[5];
+    assign _gate_ip_oe                           = gates_output[6];
+    assign _gate__bus__reg_ram_value_in__signal  = gates_output[7];
+    assign _gate_a_we                            = gates_output[8];
+    assign _gate_a_oe                            = gates_output[9];
+    assign _gate_b_we                            = gates_output[10];
+    assign _gate_b_oe                            = gates_output[11];
+    assign _gate_alu_op_plus                     = gates_output[12];
+    assign _gate_alu_op_lshift                   = gates_output[13];
+    assign _gate__alu_out__bus__signal           = gates_output[14];
+    assign _gate_halt                            = gates_output[15];
+    assign _gate_ip_inc                          = gates_output[16];
+    assign _gate_mux1_choice                     = gates_output[17];
+    assign _gate_mux2_choice                     = gates_output[18];
+    assign _gate__reg_a_out__bus__signal         = gates_output[19];
+    assign _gate__reg_b_out__bus__signal         = gates_output[20];
+    assign _gate_alu_op_inc                      = gates_output[21];
+    assign _gate__reg_ram_value_out__bus__signal = gates_output[22];
+    assign _gate_alu_op_rshift                   = gates_output[23];
 
     /// Debug
     reg [64:0] current_controller_stage;
@@ -374,10 +381,20 @@ module computer;
 
     wire [15:0] _alu_out;
     wire _gate_alu_op_plus;
-    wire _gate_alu_op_and;
+    wire _gate_alu_op_lshift;
+    wire _gate_alu_op_rshift;
     wire _gate_alu_op_inc;
     wire _alu_flag_zero;
-    alu alu(_mux1_out, _mux2_out, _alu_out, _gate_alu_op_plus, _gate_alu_op_and, _gate_alu_op_inc, _alu_flag_zero);
+    alu alu(
+        _mux1_out,
+        _mux2_out,
+        _alu_out,
+        _gate_alu_op_plus,
+        _gate_alu_op_lshift,
+        _gate_alu_op_rshift,
+        _gate_alu_op_inc,
+        _alu_flag_zero
+    );
 
     wire _gate__alu_out__bus__signal;
     gate _gate__alu_out_bus(
@@ -409,7 +426,7 @@ module computer;
         _gate_b_oe,
 
         _gate_alu_op_plus,
-        _gate_alu_op_and,
+        _gate_alu_op_lshift,
 
         _gate__alu_out__bus__signal,
 
@@ -426,6 +443,8 @@ module computer;
         _gate_alu_op_inc,
 
         _gate__reg_ram_value_out__bus__signal,
+
+        _gate_alu_op_rshift,
 
         clock,
         reset
