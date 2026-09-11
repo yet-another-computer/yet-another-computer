@@ -225,7 +225,7 @@ module computer;
             #1;
     end
 
-    logic [15:0] bus;
+    wire [15:0] bus;
 
     wire _gate_ram_address_we;
     wire _gate_ram_address_oe;
@@ -261,10 +261,9 @@ module computer;
     );
 
     wire _gate__reg_ram_value_out__bus__signal;
-    wire [7:0] _reg_ram_value_out_bus;
-    gate #(.WIDTH(8)) _gate__reg_ram_value_out__bus(
-        _reg_ram_value_out,
-        _reg_ram_value_out_bus,
+    gate _gate__reg_ram_value_out__bus(
+        {8'b0, _reg_ram_value_out},
+        bus,
         _gate__reg_ram_value_out__bus__signal
     );
 
@@ -276,6 +275,7 @@ module computer;
     wire _gate_ip_oe;
     wire _gate_ip_inc;
     wire [15:0] _reg_ip_out;
+    assign bus = _reg_ip_out;
     counter reg_ip(
         bus,
         _reg_ip_out,
@@ -310,10 +310,9 @@ module computer;
     );
 
     wire _gate__reg_a_out__bus__signal;
-    wire [15:0] _reg_a_out_bus;
     gate _gate__reg_a_out__bus(
         _reg_a_out,
-        _reg_a_out_bus,
+        bus,
         _gate__reg_a_out__bus__signal
     );
 
@@ -330,10 +329,9 @@ module computer;
     );
 
     wire _gate__reg_b_out__bus__signal;
-    wire [15:0] _reg_b_out_bus;
     gate _gate__reg_b_out__bus(
         _reg_b_out,
-        _reg_b_out_bus,
+        bus,
         _gate__reg_b_out__bus__signal
     );
 
@@ -353,10 +351,9 @@ module computer;
     alu alu(_mux1_out, _mux2_out, _alu_out, _gate_alu_op_plus, _gate_alu_op_and, _gate_alu_op_inc, _alu_flag_zero);
 
     wire _gate__alu_out__bus__signal;
-    wire [15:0] _alu_out_bus;
     gate _gate__alu_out_bus(
         _alu_out,
-        _alu_out_bus,
+        bus,
         _gate__alu_out__bus__signal
     );
     
@@ -404,21 +401,6 @@ module computer;
         clock,
         reset
     );
-
-    always @(*) begin
-        if (_gate_ip_oe)
-            bus = _reg_ip_out;
-        else if (_gate__reg_ram_value_out__bus__signal)
-            bus = {8'b0, _reg_ram_value_out_bus};
-        else if (_gate__alu_out__bus__signal)
-            bus = _alu_out_bus;
-        else if (_gate__reg_a_out__bus__signal)
-            bus = _reg_a_out_bus;
-        else if (_gate__reg_b_out__bus__signal)
-            bus = _reg_b_out_bus;
-        else
-            bus = 16'hbeef;
-    end
 
     reg [32:0] current_instruction_name;
     always @(*) begin
