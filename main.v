@@ -274,11 +274,9 @@ module computer;
     wire _gate_ip_we;
     wire _gate_ip_oe;
     wire _gate_ip_inc;
-    wire [15:0] _reg_ip_out;
-    assign bus = _reg_ip_out;
     counter reg_ip(
         bus,
-        _reg_ip_out,
+        bus,
         _gate_ip_we,
         _gate_ip_oe,
         _gate_ip_inc,
@@ -416,7 +414,7 @@ module computer;
             bus,
             _reg_ram_address_out,
             _reg_ram_value_out,
-            _reg_ip_out,
+            reg_ip.value,
             _reg_cmd_out,
             _reg_a_out,
             _reg_b_out,
