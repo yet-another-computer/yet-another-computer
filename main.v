@@ -124,18 +124,18 @@ module controller #(
 
         /// No-op
         instruction_name[4'b0000] = "NOOP";
-        instruction_microcode[4'b0000 * 16 + 0] = A_OE;
+        instruction_microcode[4'b0000 * 16 + 0] = A_OE | B_OE;
         instruction_microcode_len[4'b0000] = 1;
 
         /// Load a, b ([b] -> a)
         instruction_name[4'b0001] = "LOAD";
-        instruction_microcode[4'b0001 * 16 + 0] = B_OE | REG_B_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
+        instruction_microcode[4'b0001 * 16 + 0] = RAM_ADDRESS_WE;
         instruction_microcode[4'b0001 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
-        instruction_microcode[4'b0001 * 16 + 2] = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL | A_WE;
-        instruction_microcode[4'b0001 * 16 + 3] = A_OE | ALU_OP_AND | ALU_OUT__BUS__SIGNAL | A_WE;
-        instruction_microcode[4'b0001 * 16 + 4] = B_OE | MUX1_CHOICE | ALU_OP_INC | ALU_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
+        instruction_microcode[4'b0001 * 16 + 2] = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL;
+        instruction_microcode[4'b0001 * 16 + 3] = ALU_OP_AND | ALU_OUT__BUS__SIGNAL;
+        instruction_microcode[4'b0001 * 16 + 4] = ALU_OP_INC | ALU_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
         instruction_microcode[4'b0001 * 16 + 5] = RAM_ADDRESS_OE | RAM_VALUE_WE;
-        instruction_microcode[4'b0001 * 16 + 6] = RAM_VALUE_OE | MUX2_CHOICE | A_OE | ALU_OP_PLUS | ALU_OUT__BUS__SIGNAL | A_WE;
+        instruction_microcode[4'b0001 * 16 + 6] = RAM_VALUE_OE | MUX2_CHOICE | ALU_OP_PLUS | ALU_OUT__BUS__SIGNAL;
         instruction_microcode_len[4'b0001] = 7;
 
         /// Store a, b (b -> [a])
@@ -178,7 +178,31 @@ module controller #(
             1: gates_output = RAM_ADDRESS_OE | RAM_VALUE_WE | IP_INC;
             2: gates_output = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL | CMD_WE;
             default: begin
-                if (command_id == 4'b0011 && !_alu_flag_zero)
+                if (command_id == 4'b0001) begin
+                    logic [32-1:0] src_oe;
+                    logic [32-1:0] src_oe_bus;
+                    logic [32-1:0] dst_we;
+                    logic [32-1:0] dst_oe;
+                    logic [32-1:0] src_mux_choice;
+                    logic [32-1:0] dst_mux_choice;
+                    src_oe     = command[0] ? A_OE : B_OE;
+                    src_oe_bus = command[0] ? REG_A_OUT__BUS__SIGNAL : REG_B_OUT__BUS__SIGNAL;
+                    dst_we     = command[0] ? B_WE : A_WE;
+                    dst_oe     = command[0] ? B_OE : A_OE;
+                    src_mux_choice = command[0] ? 0 : MUX1_CHOICE;
+                    dst_mux_choice = command[0] ? MUX1_CHOICE : 0;
+
+                    gates_output = instruction_microcode[{command_id, step - 2'd3}];
+                    case (step - 2'd3)
+                        0: gates_output |= src_oe | src_oe_bus;
+                        2: gates_output |= dst_we;
+                        3: gates_output |= dst_oe | dst_we | dst_mux_choice;
+                        4: gates_output |= src_oe | src_mux_choice;
+                        6: gates_output |= dst_oe | dst_we | dst_mux_choice;
+                        default: begin end
+                    endcase
+                end
+                else if (command_id == 4'b0011 && !_alu_flag_zero)
                     gates_output = IP_INC;
                 else
                     gates_output = instruction_microcode[{command_id, step - 2'd3}];
