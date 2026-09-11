@@ -87,6 +87,8 @@ module controller #(
 
     output wire _gate_alu_op_inc,
 
+    output wire _gate__reg_ram_value_out__bus__signal,
+
     input wire clock,
     input wire reset
 );
@@ -112,6 +114,7 @@ module controller #(
     localparam REG_A_OUT__BUS__SIGNAL        = 32'b0000010000000000000000000;
     localparam REG_B_OUT__BUS__SIGNAL        = 32'b0000100000000000000000000;
     localparam ALU_OP_INC                    = 32'b0001000000000000000000000;
+    localparam REG_RAM_VALUE_OUT__BUS__SIGNAL= 32'b0010000000000000000000000;
 
     reg [8*4:0] instruction_name[16];
     reg [32-1:0] instruction_microcode[2**WIDTH];
@@ -130,7 +133,7 @@ module controller #(
         instruction_name[4'b0001] = "LOAD";
         instruction_microcode[4'b0001 * 16 + 0] = B_OE | REG_B_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
         instruction_microcode[4'b0001 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
-        instruction_microcode[4'b0001 * 16 + 2] = RAM_VALUE_OE | A_WE;
+        instruction_microcode[4'b0001 * 16 + 2] = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL | A_WE;
         instruction_microcode[4'b0001 * 16 + 3] = A_OE | ALU_OP_AND | ALU_OUT__BUS__SIGNAL | A_WE;
         instruction_microcode[4'b0001 * 16 + 4] = B_OE | MUX1_CHOICE | ALU_OP_INC | ALU_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
         instruction_microcode[4'b0001 * 16 + 5] = RAM_ADDRESS_OE | RAM_VALUE_WE;
@@ -145,7 +148,7 @@ module controller #(
         instruction_name[4'b0011] = "JZ";
         instruction_microcode[4'b0011 * 16 + 0] = IP_OE | RAM_ADDRESS_WE;
         instruction_microcode[4'b0011 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
-        instruction_microcode[4'b0011 * 16 + 2] = RAM_VALUE_OE | IP_WE | IP_INC;
+        instruction_microcode[4'b0011 * 16 + 2] = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL | IP_WE | IP_INC;
         instruction_microcode_len[4'b0011] = 3;
 
         /// Halt
@@ -175,7 +178,7 @@ module controller #(
         case (step)
             0: gates_output = IP_OE | RAM_ADDRESS_WE;
             1: gates_output = RAM_ADDRESS_OE | RAM_VALUE_WE | IP_INC;
-            2: gates_output = RAM_VALUE_OE | CMD_WE;
+            2: gates_output = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL | CMD_WE;
             default: begin
                 if (command_id == 4'b0011 && !_alu_flag_zero)
                     gates_output = IP_INC;
@@ -207,6 +210,7 @@ module controller #(
     assign _gate__reg_a_out__bus__signal        = gates_output[19];
     assign _gate__reg_b_out__bus__signal        = gates_output[20];
     assign _gate_alu_op_inc                     = gates_output[21];
+    assign _gate__reg_ram_value_out__bus__signal= gates_output[22];
 endmodule
 
 module computer;
@@ -254,6 +258,14 @@ module computer;
         bus[7:0],
         _reg_ram_value_in,
         _gate__bus__reg_ram_value_in__signal
+    );
+
+    wire _gate__reg_ram_value_out__bus__signal;
+    wire [7:0] _reg_ram_value_out_bus;
+    gate #(.WIDTH(8)) _gate__reg_ram_value_out__bus(
+        _reg_ram_value_out,
+        _reg_ram_value_out_bus,
+        _gate__reg_ram_value_out__bus__signal
     );
 
     wire [7:0] _reg_ram_value_inout;
@@ -331,7 +343,7 @@ module computer;
 
     wire [15:0] _mux2_out;
     wire _gate_mux2_choice;
-    mux mux2(_reg_b_out, {8'b0, _reg_ram_value_inout}, _gate_mux2_choice, _mux2_out);
+    mux mux2(_reg_b_out, {8'b0, _reg_ram_value_out}, _gate_mux2_choice, _mux2_out);
 
     wire [15:0] _alu_out;
     wire _gate_alu_op_plus;
@@ -387,6 +399,8 @@ module computer;
 
         _gate_alu_op_inc,
 
+        _gate__reg_ram_value_out__bus__signal,
+
         clock,
         reset
     );
@@ -394,8 +408,8 @@ module computer;
     always @(*) begin
         if (_gate_ip_oe)
             bus = _reg_ip_out;
-        else if (_gate_ram_value_oe)
-            bus = {8'b0, _reg_ram_value_out};
+        else if (_gate__reg_ram_value_out__bus__signal)
+            bus = {8'b0, _reg_ram_value_out_bus};
         else if (_gate__alu_out__bus__signal)
             bus = _alu_out_bus;
         else if (_gate__reg_a_out__bus__signal)
@@ -432,6 +446,6 @@ module computer;
         reset <= 0;
         #2;
 
-        #50 $finish;
+        #100 $finish;
    	end
 endmodule
