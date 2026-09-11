@@ -12,10 +12,8 @@ module alu #(
     output logic flag_zero
 );
     always @(*) begin
-        if (op_plus) begin
+        if (op_plus)
             out = a + b;
-            $display("out=%h", a+b);
-        end
         if (op_and)
             out = a << 8;
         if (op_inc)
@@ -211,6 +209,15 @@ module controller #(
     assign _gate__reg_b_out__bus__signal        = gates_output[20];
     assign _gate_alu_op_inc                     = gates_output[21];
     assign _gate__reg_ram_value_out__bus__signal= gates_output[22];
+
+    /// Debug
+    reg [64:0] current_controller_stage;
+    always @(*) begin
+        if (step < 3)
+            current_controller_stage = "#fetch";
+        else
+            current_controller_stage = controller.instruction_name[command[7:4]];
+    end
 endmodule
 
 module computer;
@@ -400,11 +407,6 @@ module computer;
         reset
     );
 
-    reg [32:0] current_instruction_name;
-    always @(*) begin
-        current_instruction_name = controller.instruction_name[_reg_cmd_out[7:4]];
-    end
-
    	initial begin
         
         $monitor("TICK=%0t STEP=%0d RESET=%b BUS=%h RAM_ADDR=%h RAM_VALUE=%h IP=%h CMD=%h A=%h B=%h (%0s)",
@@ -418,7 +420,7 @@ module computer;
             _reg_cmd_out,
             _reg_a_out,
             _reg_b_out,
-            current_instruction_name
+            controller.current_controller_stage
         );
 
         reset <= 1;
