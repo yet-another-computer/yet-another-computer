@@ -150,15 +150,19 @@ module controller #(
         instruction_microcode[4'b0010 * 16 + 2] = RAM_ADDRESS_OE | RAM_VALUE_OE | BUS__REG_RAM_VALUE_IN__SIGNAL | RAM_FLAG_WRITE;
         instruction_microcode_len[4'b0010] = 3;
 
-        /// Load a, %d (%d -> a)
-        
-        
-        /// Jump Zero
-        instruction_name[4'b0011] = "JZ";
+        /// Load direct a, %d (%d -> a)
+        instruction_name[4'b0011] = "LDD";
         instruction_microcode[4'b0011 * 16 + 0] = IP_OE | RAM_ADDRESS_WE;
         instruction_microcode[4'b0011 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
-        instruction_microcode[4'b0011 * 16 + 2] = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL | IP_WE | IP_INC;
+        instruction_microcode[4'b0011 * 16 + 2] = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL | A_WE | IP_INC;
         instruction_microcode_len[4'b0011] = 3;
+
+        /// Jump Zero
+        instruction_name[4'b1110] = "JZ";
+        instruction_microcode[4'b1110 * 16 + 0] = IP_OE | RAM_ADDRESS_WE;
+        instruction_microcode[4'b1110 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
+        instruction_microcode[4'b1110 * 16 + 2] = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL | IP_WE | IP_INC;
+        instruction_microcode_len[4'b1110] = 3;
 
         /// Halt
         instruction_name[4'b1111] = "HALT";
@@ -214,7 +218,7 @@ module controller #(
                 //     endcase
                 // end
                 // else
-                if (command_id == 4'b0011 && !_alu_flag_zero)
+                if (command_id == 4'b1110 && !_alu_flag_zero)
                     gates_output = IP_INC;
                 else
                     gates_output = instruction_microcode[{command_id, step - 2'd3}];
