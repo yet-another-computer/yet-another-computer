@@ -138,15 +138,15 @@ module controller #(
 
         /// Load a, b ([b] -> a)
         instruction_name[4'b0001] = "LD";
-        instruction_microcode[4'b0001 * 16 + 0] = B_OE | REG_B_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
+        instruction_microcode[4'b0001 * 16 + 0] = RAM_ADDRESS_WE;
         instruction_microcode[4'b0001 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_OUT_WE;
-        instruction_microcode[4'b0001 * 16 + 2] = RAM_VALUE_OUT_OE | A_WE;
+        instruction_microcode[4'b0001 * 16 + 2] = RAM_VALUE_OUT_OE;
         instruction_microcode_len[4'b0001] = 3;
 
         /// Store a, b (b -> [a])
         instruction_name[4'b0010] = "ST";
-        instruction_microcode[4'b0010 * 16 + 0] = A_OE | REG_A_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
-        instruction_microcode[4'b0010 * 16 + 1] = B_OE | REG_B_OUT__BUS__SIGNAL | RAM_VALUE_IN_WE;
+        instruction_microcode[4'b0010 * 16 + 0] = RAM_ADDRESS_WE;
+        instruction_microcode[4'b0010 * 16 + 1] = RAM_VALUE_IN_WE;
         instruction_microcode[4'b0010 * 16 + 2] = RAM_ADDRESS_OE | RAM_VALUE_IN_OE | RAM_FLAG_WRITE;
         instruction_microcode_len[4'b0010] = 3;
 

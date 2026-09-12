@@ -4,6 +4,7 @@ run: build
 
 .PHONY: build
 build:
+	python3 assembler.py main.asm
 	iverilog -g2012 -o a.out main.v components.v
 
 .PHONY: clean
