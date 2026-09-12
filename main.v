@@ -55,16 +55,12 @@ module controller #(
     input  wire _alu_flag_zero,
 
     output wire _gate_ram_address_we,
-    output wire _gate_ram_value_we,
     output wire _gate_ip_we,
     output wire _gate_cmd_we,
 
     output wire _gate_ram_address_oe,
-    output wire _gate_ram_value_oe,
     output wire _gate_ip_oe,
 
-    output wire _gate__bus__reg_ram_value_in__signal,
-    
     output wire _gate_a_we,
     output wire _gate_a_oe,
 
@@ -88,40 +84,44 @@ module controller #(
 
     output wire _gate_alu_op_inc,
 
-    output wire _gate__reg_ram_value_out__bus__signal,
-
     output wire _gate_alu_op_rshift,
 
     output wire _gate_ram_flag_write,
 
+    output wire _gate_ram_value_in_we,
+    output wire _gate_ram_value_in_oe,
+
+    output wire _gate_ram_value_out_we,
+    output wire _gate_ram_value_out_oe,
+
     input wire clock,
     input wire reset
 );
-    localparam RAM_ADDRESS_WE                 = 32'b0000000000000000000000001;
-    localparam RAM_VALUE_WE                   = 32'b0000000000000000000000010;
-    localparam IP_WE                          = 32'b0000000000000000000000100;
-    localparam CMD_WE                         = 32'b0000000000000000000001000;
-    localparam RAM_ADDRESS_OE                 = 32'b0000000000000000000010000;
-    localparam RAM_VALUE_OE                   = 32'b0000000000000000000100000;
-    localparam IP_OE                          = 32'b0000000000000000001000000;
-    localparam BUS__REG_RAM_VALUE_IN__SIGNAL  = 32'b0000000000000000010000000;
-    localparam A_WE                           = 32'b0000000000000000100000000;
-    localparam A_OE                           = 32'b0000000000000001000000000;
-    localparam B_WE                           = 32'b0000000000000010000000000;
-    localparam B_OE                           = 32'b0000000000000100000000000;
-    localparam ALU_OP_PLUS                    = 32'b0000000000001000000000000;
-    localparam ALU_OP_LSHIFT                  = 32'b0000000000010000000000000;
-    localparam ALU_OUT__BUS__SIGNAL           = 32'b0000000000100000000000000;
-    localparam HALT                           = 32'b0000000001000000000000000;
-    localparam IP_INC                         = 32'b0000000010000000000000000;
-    localparam MUX1_CHOICE                    = 32'b0000000100000000000000000;
-    localparam MUX2_CHOICE                    = 32'b0000001000000000000000000;
-    localparam REG_A_OUT__BUS__SIGNAL         = 32'b0000010000000000000000000;
-    localparam REG_B_OUT__BUS__SIGNAL         = 32'b0000100000000000000000000;
-    localparam ALU_OP_INC                     = 32'b0001000000000000000000000;
-    localparam REG_RAM_VALUE_OUT__BUS__SIGNAL = 32'b0010000000000000000000000;
-    localparam ALU_OP_RLSHIFT                 = 32'b0100000000000000000000000;
-    localparam RAM_FLAG_WRITE                 = 32'b1000000000000000000000000;
+    localparam RAM_ADDRESS_WE                 = 32'b00000000000000000000000000000001;
+    localparam IP_WE                          = 32'b00000000000000000000000000000100;
+    localparam CMD_WE                         = 32'b00000000000000000000000000001000;
+    localparam RAM_ADDRESS_OE                 = 32'b00000000000000000000000000010000;
+    localparam IP_OE                          = 32'b00000000000000000000000001000000;
+    localparam A_WE                           = 32'b00000000000000000000000100000000;
+    localparam A_OE                           = 32'b00000000000000000000001000000000;
+    localparam B_WE                           = 32'b00000000000000000000010000000000;
+    localparam B_OE                           = 32'b00000000000000000000100000000000;
+    localparam ALU_OP_PLUS                    = 32'b00000000000000000001000000000000;
+    localparam ALU_OP_LSHIFT                  = 32'b00000000000000000010000000000000;
+    localparam ALU_OUT__BUS__SIGNAL           = 32'b00000000000000000100000000000000;
+    localparam HALT                           = 32'b00000000000000001000000000000000;
+    localparam IP_INC                         = 32'b00000000000000010000000000000000;
+    localparam MUX1_CHOICE                    = 32'b00000000000000100000000000000000;
+    localparam MUX2_CHOICE                    = 32'b00000000000001000000000000000000;
+    localparam REG_A_OUT__BUS__SIGNAL         = 32'b00000000000010000000000000000000;
+    localparam REG_B_OUT__BUS__SIGNAL         = 32'b00000000000100000000000000000000;
+    localparam ALU_OP_INC                     = 32'b00000000001000000000000000000000;
+    localparam ALU_OP_RLSHIFT                 = 32'b00000000100000000000000000000000;
+    localparam RAM_FLAG_WRITE                 = 32'b00000001000000000000000000000000;
+    localparam RAM_VALUE_IN_WE                = 32'b00000010000000000000000000000000;
+    localparam RAM_VALUE_IN_OE                = 32'b00000100000000000000000000000000;
+    localparam RAM_VALUE_OUT_WE               = 32'b00001000000000000000000000000000;
+    localparam RAM_VALUE_OUT_OE               = 32'b00010000000000000000000000000000;
 
     reg [8*4:0] instruction_name[16];
     reg [32-1:0] instruction_microcode[2**WIDTH];
@@ -139,29 +139,29 @@ module controller #(
         /// Load a, b ([b] -> a)
         instruction_name[4'b0001] = "LD";
         instruction_microcode[4'b0001 * 16 + 0] = B_OE | REG_B_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
-        instruction_microcode[4'b0001 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
-        instruction_microcode[4'b0001 * 16 + 2] = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL | A_WE;
+        instruction_microcode[4'b0001 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_OUT_WE;
+        instruction_microcode[4'b0001 * 16 + 2] = RAM_VALUE_OUT_OE | A_WE;
         instruction_microcode_len[4'b0001] = 3;
 
         /// Store a, b (b -> [a])
         instruction_name[4'b0010] = "ST";
         instruction_microcode[4'b0010 * 16 + 0] = A_OE | REG_A_OUT__BUS__SIGNAL | RAM_ADDRESS_WE;
-        instruction_microcode[4'b0010 * 16 + 1] = B_OE | REG_B_OUT__BUS__SIGNAL | BUS__REG_RAM_VALUE_IN__SIGNAL | RAM_VALUE_WE;
-        instruction_microcode[4'b0010 * 16 + 2] = RAM_ADDRESS_OE | RAM_VALUE_OE | BUS__REG_RAM_VALUE_IN__SIGNAL | RAM_FLAG_WRITE;
+        instruction_microcode[4'b0010 * 16 + 1] = B_OE | REG_B_OUT__BUS__SIGNAL | RAM_VALUE_IN_WE;
+        instruction_microcode[4'b0010 * 16 + 2] = RAM_ADDRESS_OE | RAM_VALUE_IN_OE | RAM_FLAG_WRITE;
         instruction_microcode_len[4'b0010] = 3;
 
         /// Load direct a, %d (%d -> a)
         instruction_name[4'b0011] = "LDD";
         instruction_microcode[4'b0011 * 16 + 0] = IP_OE | RAM_ADDRESS_WE;
-        instruction_microcode[4'b0011 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
-        instruction_microcode[4'b0011 * 16 + 2] = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL | A_WE | IP_INC;
+        instruction_microcode[4'b0011 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_OUT_WE;
+        instruction_microcode[4'b0011 * 16 + 2] = RAM_VALUE_OUT_OE | IP_INC;
         instruction_microcode_len[4'b0011] = 3;
 
         /// Jump Zero
         instruction_name[4'b1110] = "JZ";
         instruction_microcode[4'b1110 * 16 + 0] = IP_OE | RAM_ADDRESS_WE;
-        instruction_microcode[4'b1110 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_WE;
-        instruction_microcode[4'b1110 * 16 + 2] = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL | IP_WE | IP_INC;
+        instruction_microcode[4'b1110 * 16 + 1] = RAM_ADDRESS_OE | RAM_VALUE_OUT_WE;
+        instruction_microcode[4'b1110 * 16 + 2] = RAM_VALUE_OUT_OE | IP_WE | IP_INC;
         instruction_microcode_len[4'b1110] = 3;
 
         /// Halt
@@ -190,35 +190,20 @@ module controller #(
     always @(*) begin
         case (step)
             0: gates_output = IP_OE | RAM_ADDRESS_WE;
-            1: gates_output = RAM_ADDRESS_OE | RAM_VALUE_WE | IP_INC;
-            2: gates_output = RAM_VALUE_OE | REG_RAM_VALUE_OUT__BUS__SIGNAL | CMD_WE;
+            1: gates_output = RAM_ADDRESS_OE | RAM_VALUE_OUT_WE | IP_INC;
+            2: gates_output = RAM_VALUE_OUT_OE | CMD_WE;
             default: begin
-                // if (command_id == 4'b0001) begin
-                //     logic [32-1:0] src_oe;
-                //     logic [32-1:0] src_oe_bus;
-                //     logic [32-1:0] dst_we;
-                //     logic [32-1:0] dst_oe;
-                //     logic [32-1:0] src_mux_choice;
-                //     logic [32-1:0] dst_mux_choice;
-                //     src_oe     = command[0] ? A_OE : B_OE;
-                //     src_oe_bus = command[0] ? REG_A_OUT__BUS__SIGNAL : REG_B_OUT__BUS__SIGNAL;
-                //     dst_we     = command[0] ? B_WE : A_WE;
-                //     dst_oe     = command[0] ? B_OE : A_OE;
-                //     src_mux_choice = command[0] ? 0 : MUX1_CHOICE;
-                //     dst_mux_choice = command[0] ? MUX1_CHOICE : 0;
+                if (command_id == 4'b0011) begin
+                    logic [32-1:0] dst_we;
+                    dst_we = command[0] ? B_WE : A_WE;
 
-                //     gates_output = instruction_microcode[{command_id, step - 2'd3}];
-                //     case (step - 2'd3)
-                //         0: gates_output |= src_oe | src_oe_bus;
-                //         2: gates_output |= dst_we;
-                //         3: gates_output |= dst_oe | dst_we | dst_mux_choice;
-                //         4: gates_output |= src_oe | src_mux_choice;
-                //         6: gates_output |= dst_oe | dst_we | dst_mux_choice;
-                //         default: begin end
-                //     endcase
-                // end
-                // else
-                if (command_id == 4'b1110 && !_alu_flag_zero)
+                    gates_output = instruction_microcode[{command_id, step - 2'd3}];
+                    case (step - 2'd3)
+                        2: gates_output |= dst_we;
+                        default: begin end
+                    endcase
+                end
+                else if (command_id == 4'b1110 && !_alu_flag_zero)
                     gates_output = IP_INC;
                 else
                     gates_output = instruction_microcode[{command_id, step - 2'd3}];
@@ -227,13 +212,10 @@ module controller #(
     end
 
     assign _gate_ram_address_we                  = gates_output[0];
-    assign _gate_ram_value_we                    = gates_output[1];
     assign _gate_ip_we                           = gates_output[2];
     assign _gate_cmd_we                          = gates_output[3];
     assign _gate_ram_address_oe                  = gates_output[4];
-    assign _gate_ram_value_oe                    = gates_output[5];
     assign _gate_ip_oe                           = gates_output[6];
-    assign _gate__bus__reg_ram_value_in__signal  = gates_output[7];
     assign _gate_a_we                            = gates_output[8];
     assign _gate_a_oe                            = gates_output[9];
     assign _gate_b_we                            = gates_output[10];
@@ -248,9 +230,12 @@ module controller #(
     assign _gate__reg_a_out__bus__signal         = gates_output[19];
     assign _gate__reg_b_out__bus__signal         = gates_output[20];
     assign _gate_alu_op_inc                      = gates_output[21];
-    assign _gate__reg_ram_value_out__bus__signal = gates_output[22];
     assign _gate_alu_op_rshift                   = gates_output[23];
     assign _gate_ram_flag_write                  = gates_output[24];
+    assign _gate_ram_value_in_we                 = gates_output[25];
+    assign _gate_ram_value_in_oe                 = gates_output[26];
+    assign _gate_ram_value_out_we                = gates_output[27];
+    assign _gate_ram_value_out_oe                = gates_output[28];
 
     /// Debug
     reg [64:0] current_controller_stage;
@@ -288,38 +273,35 @@ module computer;
         reset
     );
 
-    wire _gate_ram_value_we;
-    wire _gate_ram_value_oe;
-    wire [7:0] _reg_ram_value_in;
-    wire [7:0] _reg_ram_value_out;
-    wire [7:0] __reg_ram_value_in;
-    register #(.WIDTH(8)) reg_ram_value(
-        __reg_ram_value_in,
-        _reg_ram_value_out,
-        _gate_ram_value_we,
-        _gate_ram_value_oe,
+    wire _gate_ram_value_in_we;
+    wire _gate_ram_value_in_oe;
+    wire [7:0] _reg_ram_value_in_out;
+    register #(.WIDTH(8)) reg_ram_value_in(
+        bus[7:0],
+        _reg_ram_value_in_out,
+        _gate_ram_value_in_we,
+        _gate_ram_value_in_oe,
         clock,
         reset
     );
 
-    wire _gate__bus__reg_ram_value_in__signal;
-    gate #(.WIDTH(8)) _gate__bus__reg_ram_value_in(
+    wire _gate_ram_value_out_we;
+    wire _gate_ram_value_out_oe;
+    wire [7:0] _reg_ram_value_out_in;
+    register #(.WIDTH(8)) reg_ram_value_out(
+        _reg_ram_value_out_in,
         bus[7:0],
-        _reg_ram_value_in,
-        _gate__bus__reg_ram_value_in__signal
-    );
-
-    wire _gate__reg_ram_value_out__bus__signal;
-    gate _gate__reg_ram_value_out__bus(
-        {8'b0, _reg_ram_value_out},
-        bus,
-        _gate__reg_ram_value_out__bus__signal
+        _gate_ram_value_out_we,
+        _gate_ram_value_out_oe,
+        clock,
+        reset
     );
 
     wire [7:0] _reg_ram_value_inout;
     wire _gate_ram_flag_write;
     ram ram(_reg_ram_address_out, _reg_ram_value_inout, _gate_ram_flag_write, clock);
-    assign __reg_ram_value_in = _gate__bus__reg_ram_value_in__signal ? _reg_ram_value_in : _reg_ram_value_inout;
+    assign _reg_ram_value_inout = _reg_ram_value_in_out;
+    assign _reg_ram_value_out_in = _reg_ram_value_inout;
 
     wire _gate_ip_we;
     wire _gate_ip_oe;
@@ -349,7 +331,7 @@ module computer;
     wire _gate_a_oe;
     wire [15:0] _reg_a_out;
     register reg_a(
-        bus,
+        {8'b0, bus[7:0]},
         _reg_a_out,
         _gate_a_we,
         _gate_a_oe,
@@ -368,7 +350,7 @@ module computer;
     wire _gate_b_oe;
     wire [15:0] _reg_b_out;
     register reg_b(
-        bus,
+        {8'b0, bus[7:0]},
         _reg_b_out,
         _gate_b_we,
         _gate_b_oe,
@@ -389,7 +371,7 @@ module computer;
 
     wire [15:0] _mux2_out;
     wire _gate_mux2_choice;
-    mux mux2(_reg_b_out, {8'b0, _reg_ram_value_out}, _gate_mux2_choice, _mux2_out);
+    mux mux2(_reg_a_out, _reg_b_out, _gate_mux2_choice, _mux2_out);
 
     wire [15:0] _alu_out;
     wire _gate_alu_op_plus;
@@ -421,15 +403,11 @@ module computer;
         _alu_flag_zero,
 
         _gate_ram_address_we,
-        _gate_ram_value_we,
         _gate_ip_we,
         _gate_cmd_we,
         
         _gate_ram_address_oe,
-        _gate_ram_value_oe,
         _gate_ip_oe,
-
-        _gate__bus__reg_ram_value_in__signal,
 
         _gate_a_we,
         _gate_a_oe,
@@ -454,28 +432,32 @@ module computer;
 
         _gate_alu_op_inc,
 
-        _gate__reg_ram_value_out__bus__signal,
-
         _gate_alu_op_rshift,
         _gate_ram_flag_write,
 
+        _gate_ram_value_in_we,
+        _gate_ram_value_in_oe,
+
+        _gate_ram_value_out_we,
+        _gate_ram_value_out_oe,
+        
         clock,
         reset
     );
 
    	initial begin
-        
-        $monitor("TICK=%0t STEP=%0d RESET=%b BUS=%h RAM_ADDR=%h RAM_VALUE=%h IP=%h CMD=%h A=%h B=%h (%0s)",
+        $monitor("TICK=%0t STEP=%0d RESET=%b BUS=%h RAM_ADDR=%h RAM_VALUE=(%h,%h) IP=%h CMD=%h A=%h B=%h (%0s)",
             $time,
             controller.step,
             reset,
             bus,
-            _reg_ram_address_out,
-            _reg_ram_value_out,
+            reg_ram_address.value,
+            reg_ram_value_in.value,
+            reg_ram_value_out.value,
             reg_ip.value,
-            _reg_cmd_out,
-            _reg_a_out,
-            _reg_b_out,
+            reg_cmd.value,
+            reg_a.value,
+            reg_b.value,
             controller.current_controller_stage
         );
 
@@ -484,6 +466,8 @@ module computer;
         reset <= 0;
         #2;
 
-        #100 $finish;
+        #100;
+        $writememh("dumpram.hex", ram.memory, 0, 15);
+        $finish;
    	end
 endmodule
