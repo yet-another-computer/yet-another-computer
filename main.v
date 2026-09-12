@@ -193,20 +193,47 @@ module controller #(
             1: gates_output = RAM_ADDRESS_OE | RAM_VALUE_OUT_WE | IP_INC;
             2: gates_output = RAM_VALUE_OUT_OE | CMD_WE;
             default: begin
-                if (command_id == 4'b0011) begin
-                    logic [32-1:0] dst_we;
-                    dst_we = command[0] ? B_WE : A_WE;
+                logic [3:0] innercmd_step;
+                innercmd_step = step - 2'd3;
 
-                    gates_output = instruction_microcode[{command_id, step - 2'd3}];
-                    case (step - 2'd3)
-                        2: gates_output |= dst_we;
-                        default: begin end
-                    endcase
+                if (command_id >= 4'b0001 && command_id <= 4'b0011) begin
+                    logic [32-1:0] src_oe;
+                    logic [32-1:0] src_oe_bus;
+                    logic [32-1:0] dst_oe;
+                    logic [32-1:0] dst_oe_bus;
+                    logic [32-1:0] dst_we;
+                    src_oe     = command[0] ? A_OE : B_OE;
+                    src_oe_bus = command[0] ? REG_A_OUT__BUS__SIGNAL : REG_B_OUT__BUS__SIGNAL;
+                    dst_oe     = command[0] ? B_OE : A_OE;
+                    dst_oe_bus = command[0] ? REG_B_OUT__BUS__SIGNAL : REG_A_OUT__BUS__SIGNAL;
+                    dst_we     = command[0] ? B_WE : A_WE;
+
+                    gates_output = instruction_microcode[{command_id, innercmd_step}];
+                    if (command_id == 4'b0001) begin
+                        case (innercmd_step)
+                            0: gates_output |= src_oe | src_oe_bus;
+                            2: gates_output |= dst_we;
+                            default: begin end
+                        endcase
+                    end
+                    else if (command_id == 4'b0010) begin
+                        case (innercmd_step)
+                            0: gates_output |= dst_oe | dst_oe_bus;
+                            1: gates_output |= src_oe | src_oe_bus;
+                            default: begin end
+                        endcase
+                    end
+                    else if (command_id == 4'b0011) begin
+                        case (innercmd_step)
+                            2: gates_output |= dst_we;
+                            default: begin end
+                        endcase
+                    end
                 end
                 else if (command_id == 4'b1110 && !_alu_flag_zero)
                     gates_output = IP_INC;
                 else
-                    gates_output = instruction_microcode[{command_id, step - 2'd3}];
+                    gates_output = instruction_microcode[{command_id, innercmd_step}];
             end
         endcase
     end
